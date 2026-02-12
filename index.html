@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bonding Curves & Dynamic Token Pricing</title>
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/theme/black.css" id="theme">
+  <style>
+    .reveal section h1, .reveal section h2, .reveal section h3 { text-transform: none; }
+    .reveal ul { font-size: 0.9em; }
+    .reveal pre code { font-size: 0.7em; }
+    .subtle { color: #bbb; font-size: 0.8em; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); font-size: 0.75em; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <section>
+        <h1>Bonding Curves & Dynamic Token Pricing</h1>
+        <p class="subtle">Based on speedrunethereum guide + Web3 Solidity patterns</p>
+        <p><span class="badge">Solidity</span> <span class="badge">Tokenomics</span> <span class="badge">DeFi</span></p>
+      </section>
+
+      <section>
+        <h2>Why Dynamic Pricing?</h2>
+        <ul>
+          <li>Fixed price launches: gas wars, unfair distribution, poor price discovery</li>
+          <li>Dynamic pricing reacts to demand/supply in-contract</li>
+          <li>Always-on liquidity: contract buys/sells at curve price</li>
+          <li>Transparent & predictable: math is public</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What is a Bonding Curve?</h2>
+        <ul>
+          <li>Function P(S) sets price based on current supply S</li>
+          <li>Buy: mint → supply ↑ → price rises</li>
+          <li>Sell: burn → supply ↓ → price falls</li>
+          <li>Contract is the counterparty; no order book needed</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Common Curve Shapes</h2>
+        <div class="two-col">
+          <div>
+            <h3>Linear</h3>
+            <p>P = mS + b</p>
+            <ul><li>Steady, predictable</li><li>Community tokens</li></ul>
+            <h3>Exponential</h3>
+            <p>P = a · e^{kS}</p>
+            <ul><li>Cheap early, ramps fast</li><li>Hype/early adopter heavy</li></ul>
+          </div>
+          <div>
+            <h3>Logarithmic</h3>
+            <p>P = k · ln(S + c)</p>
+            <ul><li>Rises fast, then stabilizes</li><li>Bootstraps then levels</li></ul>
+            <h3>Others</h3>
+            <ul><li>Polynomial (quadratic)</li><li>Sigmoid (slow–fast–plateau)</li><li>Step/Hybrid</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Use Cases</h2>
+        <ul>
+          <li>Token launches (ICO/IDO), NFT mints</li>
+          <li>Community/DAO tokens</li>
+          <li>AMM-like continuous liquidity</li>
+          <li>RWA tokenization, DeSci funding</li>
+          <li>Continuous funding / social bonds</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Design Levers</h2>
+        <ul>
+          <li>Slope/shape (linear vs expo vs log)</li>
+          <li>Base price / offset (b or c)</li>
+          <li>Fees/treasury cut on buys/sells</li>
+          <li>Max supply caps & reserve ratios</li>
+          <li>Buy/sell spread to discourage griefing</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Solidity Building Blocks</h2>
+        <ul>
+          <li>Track total supply (S) and reserves (ETH/erc20)</li>
+          <li>Pricing function P(S) or integral for cost</li>
+          <li>Buy: compute cost to move from S to S+Δ</li>
+          <li>Sell: compute refund from S to S-Δ</li>
+          <li>Events: Bought, Sold (buyer, amount, cost, price)</li>
+          <li>Security: reentrancy guard, overflow-safe math</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Example: Linear Curve (Pseudo-Solidity)</h2>
+        <pre><code class="hljs">function price(uint256 s) public view returns (uint256) {
+    return m * s + b; // m, b set at deploy
+}
+
+function costToMint(uint256 amount) public view returns (uint256) {
+    // integral of price from S to S+amount
+    uint256 s1 = totalSupply;
+    uint256 s2 = totalSupply + amount;
+    return m * (s1 + s2 + 1) * amount / 2 + b * amount;
+}
+</code></pre>
+        <p class="subtle">Integral approach avoids loops; adapt for expo/log curves using approximations.</p>
+      </section>
+
+      <section>
+        <h2>Practical Tips</h2>
+        <ul>
+          <li>Use fixed-point math (e.g., 1e18 scale) for exponentials/logs</li>
+          <li>Cap max mint per tx to avoid overflow/DoS</li>
+          <li>Charge protocol fee → treasury</li>
+          <li>Consider circuit breakers / pausable</li>
+          <li>Unit test edge cases: start/end supply, large buys, sells</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Risks & Gotchas</h2>
+        <ul>
+          <li>Front-running & sandwiching around large buys/sells</li>
+          <li>Price manipulation if reserve is small</li>
+          <li>Precision loss in exponentials/logs</li>
+          <li>Liquidity drain if sell path not fee-adjusted</li>
+          <li>Economic griefing: zero-liquidity start, sudden exits</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Demo Structure (suggested)</h2>
+        <ul>
+          <li>Start with linear curve mint/burn functions</li>
+          <li>Show price progression as supply grows</li>
+          <li>Add fee + treasury collection</li>
+          <li>Discuss switch to exponential/log variant</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Key Formulas (Linear)</h2>
+        <ul>
+          <li>Price: P(S) = mS + b</li>
+          <li>Buy cost from S → S+Δ: ∫ P(s) ds = m/2 · ( (S+Δ)^2 - S^2 ) + bΔ</li>
+          <li>Sell refund symmetric; apply fee/discount</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Resources</h2>
+        <ul>
+          <li>Guide: speedrunethereum.com/guides/solidity-bonding-curves-token-pricing</li>
+          <li>Course style: metana-bootcamp/web3-solidity-course</li>
+          <li>Reveal.js docs: revealjs.com</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Q&A</h2>
+        <p>Ask about curve selection, fees, edge cases, or demo steps.</p>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      hash: true,
+      slideNumber: true,
+      transition: 'slide'
+    });
+  </script>
+</body>
+</html>
