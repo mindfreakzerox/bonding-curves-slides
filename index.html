@@ -31,7 +31,7 @@
         <h1>Bonding Curves & Dynamic Token Pricing</h1>
         <p class="subtle">Speedrun Ethereum guide · Web3 Solidity course style</p>
         <p><span class="badge">Solidity</span> <span class="badge">Tokenomics</span> <span class="badge">DeFi</span></p>
-        <aside class="notes">Hook: fixed price launches cause gas wars and unfair fills. Promise: bonding curves automate price and liquidity.</aside>
+        <aside class="notes">"Alright, let’s fix the broken token launch experience. Gas wars suck, fixed prices are dumb. Bonding curves let the contract set price and liquidity automatically. Quick tour: what they are, shapes, and how to code them."</aside>
       </section>
 
       <section>
@@ -42,7 +42,7 @@
           <li>Always-on liquidity: contract buys/sells at curve price</li>
           <li>Transparent & predictable: function is public and auditable</li>
         </ul>
-        <aside class="notes">Explain price discovery and auto-market-maker concept. Emphasize predictable formula vs opaque market making.</aside>
+        <aside class="notes">"Static price = chaos. With a curve, price moves with demand and the contract is your market maker. You can always buy or sell; no shady order book, just math."</aside>
       </section>
 
       <section>
@@ -53,7 +53,7 @@
           <li>Sell: burn → S ↓ → price falls</li>
           <li>Contract is counterparty; no order book needed</li>
         </ul>
-        <aside class="notes">Stress continuous liquidity: contract always quotes buy/sell. Buyers pay, contract mints; sellers burn, contract refunds.</aside>
+        <aside class="notes">"Think vending machine: the contract quotes a price from the curve. Buy → mint, price ticks up; sell → burn, price ticks down. Liquidity is always there because the contract is the counterparty."</aside>
       </section>
 
       <section>
@@ -76,7 +76,7 @@
             <ul><li>Slow start → rapid growth → plateau</li><li>Good for cap/plateau behavior</li></ul>
           </div>
         </div>
-        <aside class="notes">Frame each as incentive profiles: linear = fair/predictable; exponential = FOMO-heavy; log = quick start then calm; sigmoid = soft cap with mid-surge.</aside>
+        <aside class="notes">"Pick a vibe: linear = fair and boring (on purpose). Exponential = FOMO rocket. Log = quick lift then chill. Sigmoid = soft cap: slow start, mid sprint, then flat."</aside>
       </section>
 
       <section>
@@ -86,7 +86,7 @@
           <li>X-axis: supply (S). Y-axis: price P(S)</li>
           <li>Tell a story: "early buyers pay X, late buyers pay Y"</li>
         </ul>
-        <aside class="notes">Live: move sliders; narrate who wins (early vs late) and why shape matters.</aside>
+        <aside class="notes">"Let’s play with the sliders. Move m or k and narrate who wins: early buyers vs late buyers. Keep reinforcing: price is just a function of supply."</aside>
       </section>
 
       <section>
@@ -98,7 +98,7 @@
           <li class="subtle">Contract: <code>contracts/LinearBondingToken.sol</code></li>
         </ul>
         <div id="calc-linear" class="calc"></div>
-        <aside class="notes">Story: community token that should not spike. Show how changing m changes slope, b sets entry price floor.</aside>
+        <aside class="notes">"Linear = no surprises. Raise m, slope gets steeper; raise b, everyone starts higher. Great for community tokens where you don’t want sudden spikes."</aside>
       </section>
 
       <section>
@@ -140,7 +140,7 @@ contract LinearBondingToken {
     }
 }
 </code></pre>
-        <aside class="notes">Point at costToMint integral to avoid loops. Mention refund path symmetry.</aside>
+        <aside class="notes">"Notice the integral in costToMint—no loops for price. Refund mirrors mint. Keep it predictable."</aside>
       </section>
 
       <section>
@@ -152,7 +152,7 @@ contract LinearBondingToken {
           <li class="subtle">Contract: <code>contracts/ExpoBondingToken.sol</code></li>
         </ul>
         <div id="calc-exp" class="calc"></div>
-        <aside class="notes">Story: NFT mint where earliest minters pay very little, late minters pay a lot. Show slider k increasing steepness.</aside>
+        <aside class="notes">"This is the rocket. Early is dirt cheap, late gets pricey fast. Great for hype mints; dangerous without caps or fees. Slide k up to show how brutal it can get."</aside>
       </section>
 
       <section>
@@ -189,7 +189,7 @@ contract ExpoBondingToken {
 }
 </code></pre>
         <p class="subtle">Use integral approximation (not loop) in production.</p>
-        <aside class="notes">Call out gas risk from loops; recommend analytic integral; suggest per-tx caps.</aside>
+        <aside class="notes">"This loop is for teaching. In production, integrate; also add per-tx caps and maybe a fee spread to resist MEV and sudden drains."</aside>
       </section>
 
       <section>
@@ -201,7 +201,7 @@ contract ExpoBondingToken {
           <li class="subtle">Contract: <code>contracts/LogBondingToken.sol</code></li>
         </ul>
         <div id="calc-log" class="calc"></div>
-        <aside class="notes">Story: early buyers pay more than base, but price growth slows → good for utility token stability.</aside>
+        <aside class="notes">"This one launches quick then chills. Good for utility tokens: early buyers pay some premium, but it flattens so late users aren’t punished."</aside>
       </section>
 
       <section>
@@ -234,7 +234,7 @@ contract LogBondingToken {
     }
 }
 </code></pre>
-        <aside class="notes">Remind: c avoids ln(0); log curve dampens late-stage price growth.</aside>
+        <aside class="notes">"Key: c keeps ln safe; k shapes how fast it rises before flattening. Pitch it as: good for keeping things sane after initial bootstrap."</aside>
       </section>
 
       <section>
@@ -246,7 +246,7 @@ contract LogBondingToken {
           <li class="subtle">Contract: <code>contracts/SigmoidBondingToken.sol</code></li>
         </ul>
         <div id="calc-sig" class="calc"></div>
-        <aside class="notes">Story: memberships/credits—cheap early, mid ramp, then flattens near L.</aside>
+        <aside class="notes">"Membership vibe: cheap early, mid-stage ramp, then it flattens near L. Slide S0 to show when the ramp kicks in."</aside>
       </section>
 
       <section>
@@ -289,7 +289,7 @@ contract SigmoidBondingToken {
 }
 </code></pre>
         <p class="subtle">Use sigmoid to simulate saturation/ceiling pricing for memberships or bandwidth credits.</p>
-        <aside class="notes">Explain parameters: L (ceiling), k (steepness), S0 (inflection). Show slider effect.</aside>
+        <aside class="notes">"Translate params: L is the ceiling price, k is how sharp the bend is, S0 is where the bend happens. Perfect for soft caps."</aside>
       </section>
 
       <section>
@@ -300,7 +300,7 @@ contract SigmoidBondingToken {
           <li>Events: Bought/Sold (buyer, amount, cost, price)</li>
           <li>Security: reentrancy guard, fixed-point math, caps per tx</li>
         </ul>
-        <aside class="notes">Reiterate: use fixed-point math libs; avoid loops in production; add fees/spreads and pause switches.</aside>
+        <aside class="notes">"Production checklist: fixed-point math library, no loops for pricing, add fees/spreads, sell path, pause switch, and guardrails."</aside>
       </section>
 
       <section>
@@ -311,7 +311,7 @@ contract SigmoidBondingToken {
           <li>Liquidity drain if sells not fee-adjusted</li>
           <li>Test edge cases: start/end supply, large Δ, pause switches</li>
         </ul>
-        <aside class="notes">Mention MEV risk; suggest per-tx caps, cooldowns, circuit breakers.</aside>
+        <aside class="notes">"MEV is real: spreads/fees help. Expo/log need good math libs. Always unit test start/end supply, big buys, and sell paths."</aside>
       </section>
 
       <section>
@@ -322,13 +322,13 @@ contract SigmoidBondingToken {
           <li>Reveal.js docs: revealjs.com</li>
           <li>Math lib: prb-math</li>
         </ul>
-        <aside class="notes">Tell students to clone repo and try sliders locally; note PRBMath install for expo/log/sig.</aside>
+        <aside class="notes">"Point them to the repo and tell them to try the sliders. If coding: install prb-math for expo/log/sigmoid."</aside>
       </section>
 
       <section>
         <h2>Q&A</h2>
         <p>Ask about curve selection, fees, edge cases, or demo steps.</p>
-        <aside class="notes">Prompt: Which curve for fair community? Which for hype NFT? What fees would you add?</aside>
+        <aside class="notes">"Prompt them: Which curve for fair community? For hype NFT? What fee/spread would you add to stop MEV?"</aside>
       </section>
 
     </div>
