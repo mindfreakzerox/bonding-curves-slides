@@ -84,6 +84,7 @@
           <li>Example: m = 0.2, b = 1 → starts at 1 token/ETH, grows steadily</li>
           <li>Use when you want predictability and fairness</li>
           <li>Cost to mint Δ from S → S+Δ: ∫P(s)ds = m/2 · ((S+Δ)^2 − S^2) + bΔ</li>
+          <li class="subtle">Contract: <code>contracts/LinearBondingToken.sol</code></li>
         </ul>
         <div id="calc-linear" class="calc"></div>
       </section>
@@ -134,6 +135,7 @@ contract LinearBondingToken {
           <li>Example: a = 0.5, k = 0.08 → very cheap early, rockets later</li>
           <li>Good for hype launches / strong early adopter rewards</li>
           <li>Warn: can get expensive fast; cap supply or add fee spread</li>
+          <li class="subtle">Contract: <code>contracts/ExpoBondingToken.sol</code></li>
         </ul>
         <div id="calc-exp" class="calc"></div>
       </section>
@@ -155,12 +157,8 @@ contract ExpoBondingToken {
         return a.mul(k.mul(s).exp()); // a * e^{k*s}
     }
     function costToMint(uint256 amount) public view returns (uint256) {
-        // approximate integral via discrete sum for demo (keep amount small)
-        uint256 cost;
-        uint256 s = totalSupply;
-        for (uint256 i = 0; i < amount; i++) {
-            cost += price(s + i);
-        }
+        uint256 cost; uint256 s = totalSupply;
+        for (uint256 i = 0; i < amount; i++) { cost += price(s + i); }
         return cost;
     }
     function mint(uint256 amount) external payable {
@@ -174,7 +172,7 @@ contract ExpoBondingToken {
     }
 }
 </code></pre>
-        <p class="subtle">Real deployment: use integral approximation or bonding-curve libraries to avoid loops.</p>
+        <p class="subtle">Use integral approximation (not loop) in production.</p>
       </section>
 
       <section>
@@ -183,6 +181,7 @@ contract ExpoBondingToken {
           <li>Example: k = 2, c = 1 → quick lift then stabilizes</li>
           <li>Good to bootstrap liquidity, then keep price from exploding</li>
           <li>Pick c to avoid ln(0); k tunes slope</li>
+          <li class="subtle">Contract: <code>contracts/LogBondingToken.sol</code></li>
         </ul>
         <div id="calc-log" class="calc"></div>
       </section>
@@ -200,15 +199,10 @@ contract LogBondingToken {
     mapping(address => uint256) public balanceOf;
     event Bought(address indexed buyer, uint256 amount, uint256 cost);
     constructor(uint256 _k, uint256 _c) { k = _k; c = _c; }
-    function price(uint256 s) public view returns (uint256) {
-        return k.mul((s + c).ln());
-    }
+    function price(uint256 s) public view returns (uint256) { return k.mul((s + c).ln()); }
     function costToMint(uint256 amount) public view returns (uint256) {
-        uint256 cost;
-        uint256 s = totalSupply;
-        for (uint256 i = 0; i < amount; i++) {
-            cost += price(s + i);
-        }
+        uint256 cost; uint256 s = totalSupply;
+        for (uint256 i = 0; i < amount; i++) { cost += price(s + i); }
         return cost;
     }
     function mint(uint256 amount) external payable {
@@ -229,6 +223,7 @@ contract LogBondingToken {
           <li>Example: L = 10, k = 0.2, S0 = 50 → slow start, mid surge, plateau ~10</li>
           <li>Good when you want a soft cap / saturation behavior</li>
           <li>Adjust S0 to shift inflection; k for steepness; L for ceiling</li>
+          <li class="subtle">Contract: <code>contracts/SigmoidBondingToken.sol</code></li>
         </ul>
         <div id="calc-sig" class="calc"></div>
       </section>
@@ -248,17 +243,16 @@ contract SigmoidBondingToken {
     event Bought(address indexed buyer, uint256 amount, uint256 cost);
     constructor(uint256 _L, uint256 _k, uint256 _S0) { L=_L; k=_k; S0=_S0; }
     function price(uint256 s) public view returns (uint256) {
-        // P = L / (1 + e^{-k(s-S0)})
-        uint256 expTerm = k.mul(int256(s > S0 ? s - S0 : S0 - s)).exp();
-        if (s < S0) { // exp(-k(s-S0)) when s < S0 => expTerm in denominator
-            return L.div(1 + expTerm);
+        if (s >= S0) {
+            uint256 expPos = k.mul(s - S0).exp();
+            return L.mul(expPos).div(1e18 + expPos);
         } else {
-            return L.div(1 + expTerm.inv()); // exp(-x) = 1/exp(x)
+            uint256 expPos = k.mul(S0 - s).exp();
+            return L.div(1e18 + expPos);
         }
     }
     function costToMint(uint256 amount) public view returns (uint256) {
-        uint256 cost;
-        uint256 s = totalSupply;
+        uint256 cost; uint256 s = totalSupply;
         for (uint256 i = 0; i < amount; i++) cost += price(s + i);
         return cost;
     }
