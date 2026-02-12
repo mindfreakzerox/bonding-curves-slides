@@ -10,7 +10,7 @@
   <style>
     .reveal section h1, .reveal section h2, .reveal section h3 { text-transform: none; }
     .reveal ul { font-size: 0.9em; }
-    .reveal pre code { font-size: 0.7em; }
+    .reveal pre code { font-size: 0.6em; }
     .subtle { color: #bbb; font-size: 0.8em; }
     .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
     .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); font-size: 0.75em; }
@@ -89,6 +89,46 @@
       </section>
 
       <section>
+        <h2>Linear Solidity (Community Token)</h2>
+        <pre><code class="hljs">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+contract LinearBondingToken {
+    uint256 public immutable m; // slope (wei per token)
+    uint256 public immutable b; // base price
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    event Bought(address indexed buyer, uint256 amount, uint256 cost);
+    event Sold(address indexed seller, uint256 amount, uint256 refund);
+    constructor(uint256 _m, uint256 _b) { m = _m; b = _b; }
+    function price(uint256 s) public view returns (uint256) { return m * s + b; }
+    function costToMint(uint256 amount) public view returns (uint256) {
+        uint256 s1 = totalSupply;
+        uint256 s2 = totalSupply + amount;
+        return m * (s1 + s2 + 1) * amount / 2 + b * amount;
+    }
+    function mint(uint256 amount) external payable {
+        uint256 cost = costToMint(amount);
+        require(msg.value >= cost, "pay cost");
+        totalSupply += amount;
+        balanceOf[msg.sender] += amount;
+        emit Bought(msg.sender, amount, cost);
+        if (msg.value > cost) payable(msg.sender).transfer(msg.value - cost);
+    }
+    function refund(uint256 amount) external {
+        require(balanceOf[msg.sender] >= amount, "bal");
+        uint256 s1 = totalSupply;
+        uint256 s2 = totalSupply - amount;
+        uint256 refundAmt = m * (s1 + s2 + 1) * amount / 2 + b * amount;
+        balanceOf[msg.sender] -= amount;
+        totalSupply -= amount;
+        emit Sold(msg.sender, amount, refundAmt);
+        payable(msg.sender).transfer(refundAmt);
+    }
+}
+</code></pre>
+      </section>
+
+      <section>
         <h2>Exponential Curve (P = a · e^{kS})</h2>
         <ul>
           <li>Example: a = 0.5, k = 0.08 → very cheap early, rockets later</li>
@@ -96,6 +136,45 @@
           <li>Warn: can get expensive fast; cap supply or add fee spread</li>
         </ul>
         <div id="calc-exp" class="calc"></div>
+      </section>
+
+      <section>
+        <h2>Exponential Solidity (Hype Launch)</h2>
+        <pre><code class="hljs">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {PRBMathUD60x18} from "prb-math/PRBMathUD60x18.sol";
+contract ExpoBondingToken {
+    using PRBMathUD60x18 for uint256;
+    uint256 public immutable a; // base
+    uint256 public immutable k; // growth (scaled 1e18)
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    event Bought(address indexed buyer, uint256 amount, uint256 cost);
+    constructor(uint256 _a, uint256 _k) { a = _a; k = _k; }
+    function price(uint256 s) public view returns (uint256) {
+        return a.mul(k.mul(s).exp()); // a * e^{k*s}
+    }
+    function costToMint(uint256 amount) public view returns (uint256) {
+        // approximate integral via discrete sum for demo (keep amount small)
+        uint256 cost;
+        uint256 s = totalSupply;
+        for (uint256 i = 0; i < amount; i++) {
+            cost += price(s + i);
+        }
+        return cost;
+    }
+    function mint(uint256 amount) external payable {
+        require(amount <= 50, "cap per tx");
+        uint256 cost = costToMint(amount);
+        require(msg.value >= cost, "pay cost");
+        totalSupply += amount;
+        balanceOf[msg.sender] += amount;
+        emit Bought(msg.sender, amount, cost);
+        if (msg.value > cost) payable(msg.sender).transfer(msg.value - cost);
+    }
+}
+</code></pre>
+        <p class="subtle">Real deployment: use integral approximation or bonding-curve libraries to avoid loops.</p>
       </section>
 
       <section>
@@ -109,13 +188,91 @@
       </section>
 
       <section>
+        <h2>Log Solidity (Stabilizing Token)</h2>
+        <pre><code class="hljs">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {PRBMathUD60x18} from "prb-math/PRBMathUD60x18.sol";
+contract LogBondingToken {
+    using PRBMathUD60x18 for uint256;
+    uint256 public immutable k;
+    uint256 public immutable c;
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    event Bought(address indexed buyer, uint256 amount, uint256 cost);
+    constructor(uint256 _k, uint256 _c) { k = _k; c = _c; }
+    function price(uint256 s) public view returns (uint256) {
+        return k.mul((s + c).ln());
+    }
+    function costToMint(uint256 amount) public view returns (uint256) {
+        uint256 cost;
+        uint256 s = totalSupply;
+        for (uint256 i = 0; i < amount; i++) {
+            cost += price(s + i);
+        }
+        return cost;
+    }
+    function mint(uint256 amount) external payable {
+        uint256 cost = costToMint(amount);
+        require(msg.value >= cost, "pay cost");
+        totalSupply += amount;
+        balanceOf[msg.sender] += amount;
+        emit Bought(msg.sender, amount, cost);
+        if (msg.value > cost) payable(msg.sender).transfer(msg.value - cost);
+    }
+}
+</code></pre>
+      </section>
+
+      <section>
         <h2>Sigmoid (S-curve)</h2>
         <ul>
           <li>Example: L = 10, k = 0.2, S0 = 50 → slow start, mid surge, plateau ~10</li>
           <li>Good when you want a soft cap / saturation behavior</li>
-          <li>Adjust S0 to shift inflection point; k for steepness; L for ceiling</li>
+          <li>Adjust S0 to shift inflection; k for steepness; L for ceiling</li>
         </ul>
         <div id="calc-sig" class="calc"></div>
+      </section>
+
+      <section>
+        <h2>Sigmoid Solidity (Capped Growth)</h2>
+        <pre><code class="hljs">// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+import {PRBMathUD60x18} from "prb-math/PRBMathUD60x18.sol";
+contract SigmoidBondingToken {
+    using PRBMathUD60x18 for uint256;
+    uint256 public immutable L;  // ceiling price
+    uint256 public immutable k;  // steepness (1e18)
+    uint256 public immutable S0; // inflection
+    uint256 public totalSupply;
+    mapping(address => uint256) public balanceOf;
+    event Bought(address indexed buyer, uint256 amount, uint256 cost);
+    constructor(uint256 _L, uint256 _k, uint256 _S0) { L=_L; k=_k; S0=_S0; }
+    function price(uint256 s) public view returns (uint256) {
+        // P = L / (1 + e^{-k(s-S0)})
+        uint256 expTerm = k.mul(int256(s > S0 ? s - S0 : S0 - s)).exp();
+        if (s < S0) { // exp(-k(s-S0)) when s < S0 => expTerm in denominator
+            return L.div(1 + expTerm);
+        } else {
+            return L.div(1 + expTerm.inv()); // exp(-x) = 1/exp(x)
+        }
+    }
+    function costToMint(uint256 amount) public view returns (uint256) {
+        uint256 cost;
+        uint256 s = totalSupply;
+        for (uint256 i = 0; i < amount; i++) cost += price(s + i);
+        return cost;
+    }
+    function mint(uint256 amount) external payable {
+        uint256 cost = costToMint(amount);
+        require(msg.value >= cost, "pay cost");
+        totalSupply += amount;
+        balanceOf[msg.sender] += amount;
+        emit Bought(msg.sender, amount, cost);
+        if (msg.value > cost) payable(msg.sender).transfer(msg.value - cost);
+    }
+}
+</code></pre>
+        <p class="subtle">Use sigmoid to simulate saturation/ceiling pricing for memberships or bandwidth credits.</p>
       </section>
 
       <section>
@@ -126,14 +283,6 @@
           <li>Events: Bought/Sold (buyer, amount, cost, price)</li>
           <li>Security: reentrancy guard, fixed-point math, caps per tx</li>
         </ul>
-        <pre><code class="hljs">function price(uint256 s) public view returns (uint256) {
-    return m * s + b;
-}
-function costToMint(uint256 amount) public view returns (uint256) {
-    uint256 s1 = totalSupply;
-    uint256 s2 = totalSupply + amount;
-    return m * (s1 + s2 + 1) * amount / 2 + b * amount;
-}</code></pre>
       </section>
 
       <section>
@@ -152,6 +301,7 @@ function costToMint(uint256 amount) public view returns (uint256) {
           <li>Guide: speedrunethereum.com/guides/solidity-bonding-curves-token-pricing</li>
           <li>Course style: metana-bootcamp/web3-solidity-course</li>
           <li>Reveal.js docs: revealjs.com</li>
+          <li>Math lib: prb-math</li>
         </ul>
       </section>
 
@@ -168,7 +318,7 @@ function costToMint(uint256 amount) public view returns (uint256) {
     Reveal.initialize({ hash: true, slideNumber: true, transition: 'slide' });
 
     window.addEventListener('load', () => {
-      const opts = { expressions: true, settingsMenu: false, zoomButtons: false, expressionsTopbar: false }; // sliders visible
+      const opts = { expressions: true, settingsMenu: false, zoomButtons: false, expressionsTopbar: false };
 
       const linear = Desmos.GraphingCalculator(document.getElementById('calc-linear'), opts);
       linear.setExpression({ id: 'm', latex: 'm=0.2', sliderBounds: { min: 0, max: 1, step: 0.01 } });
